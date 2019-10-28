@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -49,8 +51,25 @@ func homeLink(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/", homeLink)
-	router.HandleFunc("/events", getAllEvents)
-	log.Fatal(http.ListenAndServe(":8080", router))
+	var dir string
+
+	flag.StringVar(&dir, "dir", ".", "the directory to serve files from. Defaults to the current dir")
+	flag.Parse()
+	r := mux.NewRouter()
+
+	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(dir))))
+
+	r.HandleFunc("/events", getAllEvents).Methods("GET")
+	r.HandleFunc("/", getAllEvents).Methods("GET")
+
+	//This will serve files under http://localhost:8000/static/
+	srv := &http.Server{
+		Handler: r,
+		Addr:    "127.0.0.1:8000",
+		//Good practice to enforce timeouts for servers
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+	}
+
+	log.Fatal(srv.ListenAndServe())
 }
